@@ -16,11 +16,10 @@ FULL_MODELS_PATH = ABSOLUTE_PATH.joinpath(MODELS_PATH)
 
 template = """Context: {context}
 
-Based on Context provide me answer for following question
-Question: {question}
+Based on the context of the document, please provide me an answer for following question: {question}
 
-Tell me the information about the fact. The answer should be from context only
-do not use general knowledge to answer the query"""
+Use all of the information that is given to you. Do not make up or use any other information that is outside of this document.
+"""
 
 prompt_template = PromptTemplate(template=template, input_variables=["context","question"])
 
@@ -30,7 +29,7 @@ callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
 n_gpu_layers = 27
 n_batch = 512  # Should be between 1 and n_ctx, consider the amount of VRAM in your GPU.
 
-llama2_path = FULL_MODELS_PATH.joinpath("Llama2/llama-2-13b-chat.Q5_K_M.gguf")
+llama2_path = FULL_MODELS_PATH.joinpath("Llama2/llama2-13b-psyfighter2.Q5_K_M.gguf")
 
 llm = LlamaCpp(
     model_path=str(llama2_path),
@@ -39,7 +38,7 @@ llm = LlamaCpp(
     n_batch=n_batch,
     callback_manager=callback_manager,
     temperature = 0.9,
-    max_tokens = 4095,
+    max_tokens = 2096,
     n_parts=1,
     verbose=True,  # Verbose is required to pass to the callback manager
 )
@@ -47,7 +46,9 @@ llm = LlamaCpp(
 llm_chain = LLMChain(prompt=prompt_template, llm=llm)
 
 db = load_pdf()
-question = "How many questions are in this paper?"
-context = db.query("Questions in this paper")
-context = [text.page_content for text in context]
-llm_chain.predict(context=" ".join(context), question=question)
+question = "Give me some benefits of simulated annealing over hill climbing"
+context = db.query("Simulated annealing", 3)
+context = " ".join([text.page_content for text in context])
+response = llm_chain.predict(context=context, question=question)
+print(f"Question: {question}")
+print(f"Answer: {response}")

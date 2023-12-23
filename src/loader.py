@@ -20,7 +20,7 @@ token_splitter = TokenTextSplitter(
     encoding_name="cl100k_base"
 )
 
-def load_pdf(pdf_path="docs/comp307 test 22.pdf") -> Database:
+def load_pdf(pdf_path:str ="docs/comp307 test 22.pdf") -> Database:
     loader = PyMuPDFLoader(pdf_path)
     data = loader.load()
     docs = text_splitter.split_documents(data)

@@ -11,4 +11,5 @@ class Database():
         # self.db = FAISS.from_documents(docs, self.hf_embedding)
 
     def query(self, query, max_results=3):
-        return self.db.similarity_search(query, k=max_results)
+        results = self.db.similarity_search(query, k=max_results)
+        return " ".join([text.page_content for text in results])

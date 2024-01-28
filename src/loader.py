@@ -1,9 +1,9 @@
 from pathlib import Path
 from langchain.text_splitter import RecursiveCharacterTextSplitter, TokenTextSplitter
-from langchain.document_loaders import PyMuPDFLoader
+from langchain_community.document_loaders import PyMuPDFLoader
 from database import Database
 
-ABSOLUTE_PATH = Path().resolve()
+ABSOLUTE_PATH = Path().resolve().parent
 DOCS_PATH = Path("docs")
 FULL_DOCS_PATH = ABSOLUTE_PATH.joinpath(DOCS_PATH)
 
@@ -20,10 +20,8 @@ token_splitter = TokenTextSplitter(
     encoding_name="cl100k_base"
 )
 
-def load_pdf(pdf_path:str ="docs/comp307 test 22.pdf") -> Database:
-    loader = PyMuPDFLoader(pdf_path)
-    data = loader.load()
+def load_pdf(pdf_path:str ="comp307 test 22.pdf") -> Database:
+    data = PyMuPDFLoader(FULL_DOCS_PATH.joinpath(pdf_path).as_posix()).load()
     docs = text_splitter.split_documents(data)
-    db = Database(docs)
-    return db
+    return Database(docs)
 

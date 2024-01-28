@@ -1,6 +1,5 @@
-import llama
+import model
 from loader import load_pdf
-from database import Database
 
 template_text = """Context: {context}
 
@@ -10,12 +9,15 @@ Use all of the information that is given to you. Do not make up or use any other
 """
 
 def run():
-    db = load_pdf()
-    prompt_temp = llama.build_template(template_text)
-    llm_chain = llama.build_llm_chain(prompt_temp)
-    question = "Is greedy search always optimal? State true or false and explain why."
-    context = db.query("Greedy search", 3)
-    llama.prompt_model(llm_chain, question=question, context=context)
+    db = load_pdf("SWEN303_ALL_LEKCHURS-1.pdf")
+    llm_chain = model.build_llm_chain(template_text, type="hf")
+    # Prompt context
+    context_prompt = input("Enter query to search in db: ")
+    context = db.query(context_prompt, 3)
+    # Prompt question 
+    # E.g "Can you describe to me the importance of conducting heuristic evaluation for UX as if you're talking to a teenager with no technical knowledge?"
+    question = input("Enter question to ask: ")
+    model.prompt_model(llm_chain, question=question, context=context)
 
 if __name__ == "__main__":
     run()

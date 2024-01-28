@@ -1,0 +1,12 @@
+[huggingfacehub]
+model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
+temperature=0
+max_length=2048
+
+[llamacpp]
+model_path="Llama2/llama2-13b-psyfighter2.Q5_K_M.gguf"
+n_ctx = 6000
+n_gpu_layers = 27
+n_batch = 512  # Should be between 1 and n_ctx, consider the amount of VRAM in your GPU.
+temperature = 0.9
+max_tokens = 2096

@@ -3,7 +3,13 @@
 *.gguf
 *.bin
 models/
+# ChromaDB dir
+chromadb/*
+!chromadb/.gitkeep 
 
+# Documents dir including all PDFs
+docs/*
+!docs/.gitkeep 
 *.pdf
 
 # Byte-compiled / optimized / DLL files

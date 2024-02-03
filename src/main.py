@@ -1,5 +1,5 @@
 import model
-from loader import load_pdf
+from loader import load_documents
 
 template_text = """Context: {context}
 
@@ -9,7 +9,8 @@ Use all of the information that is given to you. Do not make up or use any other
 """
 
 def run():
-    db = load_pdf("SWEN303_ALL_LEKCHURS-1.pdf")
+    db = load_documents()
+    print(db.get_num_documents())
     llm_chain = model.build_llm_chain(template_text, type="hf")
     # Prompt context
     context_prompt = input("Enter query to search in db: ")

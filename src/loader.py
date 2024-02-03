@@ -1,7 +1,8 @@
+from glob import glob
 from pathlib import Path
 from langchain.text_splitter import RecursiveCharacterTextSplitter, TokenTextSplitter
 from langchain_community.document_loaders import PyMuPDFLoader
-from database import Database
+from database import PineconeDB, ChromaDB
 
 ABSOLUTE_PATH = Path().resolve().parent
 DOCS_PATH = Path("docs")
@@ -20,8 +21,16 @@ token_splitter = TokenTextSplitter(
     encoding_name="cl100k_base"
 )
 
-def load_pdf(pdf_path:str ="comp307 test 22.pdf") -> Database:
-    data = PyMuPDFLoader(FULL_DOCS_PATH.joinpath(pdf_path).as_posix()).load()
-    docs = text_splitter.split_documents(data)
-    return Database(docs)
+def load_documents(db="chroma", recursive=True):
+    """
+    Load all PDF document and insert the chunks into a database
+    """
+    pdf_files = glob(str(FULL_DOCS_PATH.joinpath("**/*.pdf")), recursive=recursive)
+    data = [PyMuPDFLoader(FULL_DOCS_PATH.joinpath(pdf).as_posix()).load() for pdf in pdf_files]
+    docs = [doc for d in data for doc in text_splitter.split_documents(d)]
+    if db == "chroma":
+        return ChromaDB(docs, save=True)
+    elif db == "pinecone":
+        return PineconeDB(docs)
+    raise ValueError("Invalid db choice")
 

@@ -39,7 +39,7 @@ def generate_or_update_metadata(pdf_files):
             metadata = {}
             doc_data = {}
             id = str(uuid.uuid4())
-            name = Path(pdf).stem
+            name = Path(pdf).name
             file_stats = os.stat(pdf)
             size_mb = round(file_stats.st_size / (1024 * 1024), 3)
             page_count = len(PyPDF2.PdfReader(pdf).pages)
@@ -48,21 +48,31 @@ def generate_or_update_metadata(pdf_files):
             doc_data["page_count"] = page_count
             metadata["id"] = id
             metadata["content"] = doc_data
-            print(metadata)
             output.append(metadata)
         json.dump(output, file, indent=2)
+
+    ids = {}
+    with open(metadata_path, "r") as file:
+        metadata = json.load(file)
+        for entry in metadata:
+            ids.__setitem__(entry["content"]["filename"], entry["id"])
+    return ids 
 
 def load_documents(db="chroma", recursive=True):
     """
     Load all PDF document and insert the chunks into a database
     """
     pdf_files = glob(str(FULL_DOCS_PATH.joinpath("**/*.pdf")), recursive=recursive)
-    generate_or_update_metadata(pdf_files)
+    ids = generate_or_update_metadata(pdf_files)
+    db_data = {}
     data = [PyMuPDFLoader(FULL_DOCS_PATH.joinpath(pdf).as_posix()).load() for pdf in pdf_files]
-    docs = [doc for d in data for doc in text_splitter.split_documents(d)]
+    for d, id in zip(data, ids):
+        for i, doc in enumerate(text_splitter.split_documents(d)):
+            id = f"{ids.get(Path(doc.metadata.get('source')).name)}_{i}"
+            db_data.__setitem__(id, doc)
     if db == "chroma":
-        return ChromaDB(docs, save=True)
+        return ChromaDB(db_data, save=True)
     elif db == "pinecone":
-        return PineconeDB(docs)
+        return PineconeDB(db_data)
     raise ValueError("Invalid db choice")
 

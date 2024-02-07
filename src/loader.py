@@ -2,12 +2,13 @@ import json
 import os
 import uuid
 import PyPDF2
+import fitz
+import pycld2 as cld2
 from glob import glob
 from pathlib import Path
 from langchain.text_splitter import RecursiveCharacterTextSplitter, TokenTextSplitter
 from langchain_community.document_loaders import PyMuPDFLoader
 from database import PineconeDB, ChromaDB
-
 ABSOLUTE_PATH = Path().resolve().parent
 DOCS_PATH = Path("docs")
 FULL_DOCS_PATH = ABSOLUTE_PATH.joinpath(DOCS_PATH)
@@ -24,6 +25,40 @@ token_splitter = TokenTextSplitter(
     chunk_overlap=10,
     encoding_name="cl100k_base"
 )
+
+def detect_languages(pdf):
+    """
+    Detect all languages (as codes) that are present in the document. Languages which are unknown (un) will be ignored.
+    """
+    languages = []
+    with fitz.open(pdf) as doc:
+        for page_num in range(doc.page_count):
+            page = doc[page_num]
+            text = page.get_text()
+            _, _, _, detected_langs = cld2.detect(text,  returnVectors=True)
+            if detected_langs:
+                for lang in detected_langs:
+                    if lang[3] != "un":
+                        languages.append(lang[3])
+    if not languages:
+        return None
+    languages = list(set(languages))
+    return languages
+
+def check_scannable(pdf):
+    """
+    Check if the entire PDF is searchable, that being all pages does not contain any searchable text.
+    """
+    searchable_page_count = 0
+    with fitz.open(pdf) as doc:
+        for page_num in range(doc.page_count):
+            page = doc[page_num]
+            text = page.get_text()
+            if text.strip():
+                searchable_page_count += 1
+        if searchable_page_count > 0:
+            return True
+        return False
 
 def generate_or_update_metadata(pdf_files):
     """
@@ -43,9 +78,13 @@ def generate_or_update_metadata(pdf_files):
             file_stats = os.stat(pdf)
             size_mb = round(file_stats.st_size / (1024 * 1024), 3)
             page_count = len(PyPDF2.PdfReader(pdf).pages)
+            scannable = check_scannable(pdf)
+            langauges = detect_languages(pdf)
             doc_data["filename"] = name
             doc_data["size_mb"] = size_mb
             doc_data["page_count"] = page_count
+            doc_data["scannable"] = scannable
+            doc_data["languages"] = langauges
             metadata["id"] = id
             metadata["content"] = doc_data
             output.append(metadata)

@@ -68,13 +68,36 @@ def generate_or_update_metadata(pdf_files):
     - The page count of the document
     """
     metadata_path = FULL_DOCS_PATH.joinpath("metadata.json").as_posix()
+    skip_list = [] # If the pdf exists in the pdf_files list and in JSON - skip
+    remove_list = [] # If the pdf doesn't exist in the pdf_files list but still in JSON - delete
+    metadata_json = []
+    # Check if the metadata exists and not an empty JSON, then check if the entries in pdf_files exist in the JSON. Also check for 'dead' entries in the JSON where the document has been removed and still exists in the JSON.
+    if os.path.exists(metadata_path) and os.path.getsize(metadata_path) != 0:
+        with open(metadata_path, "r") as file:
+            metadata_json = json.load(file)
+            for pdf in pdf_files:
+                name = Path(pdf).name
+                results = list(filter(lambda x:x["content"]["filename"]==name,metadata_json))
+                if len(results) > 0:
+                    skip_list.append(results[0]["content"]["filename"])
+            pdf_filenames = [Path(x).name for x in pdf_files]
+            for x in metadata_json:
+                if x["content"]["filename"] not in pdf_filenames:
+                    remove_list.append(x["content"]["filename"])
+
     with open(metadata_path, "w") as file:
-        output = []
+        # Delete any entries that are in the remove list
+        if remove_list:
+            metadata_json = [x for x in metadata_json if x["content"]["filename"] not in remove_list]
+
+        # Parses all new documents in the document directory
         for pdf in pdf_files:
             metadata = {}
             doc_data = {}
-            id = str(uuid.uuid4())
             name = Path(pdf).name
+            if name in skip_list:
+                continue
+            id = str(uuid.uuid4())
             file_stats = os.stat(pdf)
             size_mb = round(file_stats.st_size / (1024 * 1024), 3)
             page_count = len(PyPDF2.PdfReader(pdf).pages)
@@ -87,8 +110,8 @@ def generate_or_update_metadata(pdf_files):
             doc_data["languages"] = langauges
             metadata["id"] = id
             metadata["content"] = doc_data
-            output.append(metadata)
-        json.dump(output, file, indent=2)
+            metadata_json.append(metadata)
+        json.dump(metadata_json, file, indent=2)
 
     ids = {}
     with open(metadata_path, "r") as file:

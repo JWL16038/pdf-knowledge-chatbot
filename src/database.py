@@ -19,7 +19,7 @@ class PineconeDB():
     def __init__(self, docs):
         self.hf_embeddings = HuggingFaceInstructEmbeddings()
         self.index_name = "test-index"
-        self.db = Pinecone_LC.from_documents(docs, 
+        self.db = Pinecone_LC.from_documents(list(docs.values()),
                                              self.hf_embeddings, 
                                              index_name=self.index_name)
 
@@ -30,7 +30,10 @@ class PineconeDB():
     def add(self, docs):
         index = pc.Index(self.index_name)
         vectorstore = Pinecone(index, self.hf_embedding.embed_query, "text")
-        vectorstore.add_texts(docs)
+        vectorstore.add_texts(texts = [doc.page_content for doc in docs.values()], 
+                              metadata = [doc.metadata for doc in docs.values()], 
+                              ids = list(docs.keys())
+                              )
 
 class ChromaDB():
     def __init__(self, docs, collection_name = "chroma_db", save=False):
@@ -41,17 +44,17 @@ class ChromaDB():
                      embedding_function=self.hf_embeddings)
         if db._collection.count() == 0:
             db = Chroma.from_documents(
-                documents = docs, 
-                ids = [str(uuid.uuid4()) for _ in range(len(docs))],
+                documents = list(docs.values()),
+                ids = list(docs.keys()),
                 embedding=self.hf_embeddings, 
                 persist_directory= ABSOLUTE_PATH.joinpath("chromadb/").as_posix(),
                 collection_name=collection_name
             )
         else:
             db.add_texts(
-                texts = [doc.page_content for doc in docs],
-                metadatas = [doc.metadata for doc in docs],
-                ids = [str(uuid.uuid4()) for _ in range(len(docs))],
+                texts = [doc.page_content for doc in docs.values()], 
+                metadata = [doc.metadata for doc in docs.values()], 
+                ids = list(docs.keys())
             )
         print(db._collection.count())
 
@@ -70,9 +73,9 @@ class ChromaDB():
     def add(self, docs):
         assert len(docs) > 0, "Number of docs cannot be empty!"
         self.db.add_texts(
-            texts = [doc.page_content for doc in docs],
-            metadatas = [doc.metadata for doc in docs],
-            ids = [str(uuid.uuid4()) for _ in range(len(docs))],
+            texts = [doc.page_content for doc in docs.values()], 
+            metadata = [doc.metadata for doc in docs.values()], 
+            ids = list(docs.keys())
         )
         if self.save:
             self.db.persist()

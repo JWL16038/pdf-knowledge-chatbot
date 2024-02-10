@@ -62,10 +62,17 @@ def check_scannable(pdf):
 
 def generate_or_update_metadata(pdf_files):
     """
-    Generates a JSON metadata file to store the required contents for all PDF documents. These include:
+    Generates a JSON metadata file to store the required contents for all PDF documents. The JSON will include:
     - The filename of the PDF
     - The size in MBs
     - The page count of the document
+    
+    Steps:
+    - Checks if the JSON file is not malformed
+    - Detect any documents that are still in pdf_files (skip list)
+    - Detect any documents that no longer exist in pdf_files (delete list) 
+    - Parses the JSON file for new documents and delete any old ones. 
+    - Returns all valid IDs for each document in the JSON.
     """
     metadata_path = FULL_DOCS_PATH.joinpath("metadata.json").as_posix()
     skip_list = [] # If the pdf exists in the pdf_files list and in JSON - skip
@@ -74,16 +81,19 @@ def generate_or_update_metadata(pdf_files):
     # Check if the metadata exists and not an empty JSON, then check if the entries in pdf_files exist in the JSON. Also check for 'dead' entries in the JSON where the document has been removed and still exists in the JSON.
     if os.path.exists(metadata_path) and os.path.getsize(metadata_path) != 0:
         with open(metadata_path, "r") as file:
-            metadata_json = json.load(file)
-            for pdf in pdf_files:
-                name = Path(pdf).name
-                results = list(filter(lambda x:x["content"]["filename"]==name,metadata_json))
-                if len(results) > 0:
-                    skip_list.append(results[0]["content"]["filename"])
-            pdf_filenames = [Path(x).name for x in pdf_files]
-            for x in metadata_json:
-                if x["content"]["filename"] not in pdf_filenames:
-                    remove_list.append(x["content"]["filename"])
+            try:
+                metadata_json = json.load(file)
+                for pdf in pdf_files:
+                    name = Path(pdf).name
+                    results = list(filter(lambda x:x["content"]["filename"]==name,metadata_json))
+                    if len(results) > 0:
+                        skip_list.append(results[0]["content"]["filename"])
+                pdf_filenames = [Path(x).name for x in pdf_files]
+                for x in metadata_json:
+                    if x["content"]["filename"] not in pdf_filenames:
+                        remove_list.append(x["content"]["filename"])
+            except ValueError:
+                os.remove(metadata_path)
 
     with open(metadata_path, "w") as file:
         # Delete any entries that are in the remove list
@@ -113,6 +123,7 @@ def generate_or_update_metadata(pdf_files):
             metadata_json.append(metadata)
         json.dump(metadata_json, file, indent=2)
 
+    # Loads all valid document ids with the associated filename
     ids = {}
     with open(metadata_path, "r") as file:
         metadata = json.load(file)

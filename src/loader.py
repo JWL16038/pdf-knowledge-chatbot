@@ -45,7 +45,7 @@ def detect_languages(pdf):
     languages = list(set(languages))
     return languages
 
-def check_scannable(pdf):
+def check_searchable(pdf):
     """
     Check if the entire PDF is searchable, that being all pages does not contain any searchable text.
     """
@@ -111,12 +111,12 @@ def generate_or_update_metadata(pdf_files):
             file_stats = os.stat(pdf)
             size_mb = round(file_stats.st_size / (1024 * 1024), 3)
             page_count = len(PyPDF2.PdfReader(pdf).pages)
-            scannable = check_scannable(pdf)
+            searchable = check_searchable(pdf)
             langauges = detect_languages(pdf)
             doc_data["filename"] = name
             doc_data["size_mb"] = size_mb
             doc_data["page_count"] = page_count
-            doc_data["scannable"] = scannable
+            doc_data["searchable"] = searchable
             doc_data["languages"] = langauges
             metadata["id"] = id
             metadata["content"] = doc_data

@@ -5,10 +5,11 @@ import PyPDF2
 import fitz
 import pycld2 as cld2
 from glob import glob
-import os
+import shutil
 from pathlib import Path
 import fitz
 import ocrmypdf
+from ocrmypdf.exceptions import TaggedPDFError, EncryptedPdfError
 from langchain.text_splitter import RecursiveCharacterTextSplitter, TokenTextSplitter
 from langchain_community.document_loaders import PyMuPDFLoader
 from database import PineconeDB, ChromaDB
@@ -134,36 +135,54 @@ def generate_or_update_metadata(pdf_files):
             ids.__setitem__(entry["content"]["filename"], entry["id"])
     return ids 
 
-def check_searchable_and_ocr_pdfs(pdf_files):
+def ocr_documents(pdf_files):
     """
     Check if the entire PDF is searchable, if not OCR it and save the result as a new OCRed doc
     """
+    if not os.path.isdir(FULL_DOCS_PATH.joinpath("ocr")):
+        os.mkdir(FULL_DOCS_PATH.joinpath("ocr"))
+    if not os.path.isdir(FULL_DOCS_PATH.joinpath("noocr")):
+        os.mkdir(FULL_DOCS_PATH.joinpath("noocr"))
+
     for pdf_path in pdf_files:
-        searchable_page_count = 0
-        with fitz.open(pdf_path) as doc:
-            for page_num in range(doc.page_count):
-                page = doc[page_num]
-                text = page.get_text()
-                if text.strip():
-                    searchable_page_count += 1
-        if searchable_page_count == 0:
-            if not os.path.isdir(FULL_DOCS_PATH.joinpath("ocr")):
-                os.mkdir(FULL_DOCS_PATH.joinpath("ocr"))
-            new_name = FULL_DOCS_PATH.joinpath(f"ocr/{Path(pdf_path).stem}_ocr.pdf")
-            ocrmypdf.ocr(pdf_path, new_name, deskew=True, force_ocr=True)
-            # os.rename(pdf_path, f"{pdf_path}.bak")
-            i = pdf_files.index(pdf_path)
-            pdf_files[i] = new_name
+        searchable = check_searchable(pdf_path)
+        if searchable:
+            continue
+        new_name = FULL_DOCS_PATH.joinpath(f"ocr/{Path(pdf_path).stem}_ocr.pdf")
+        try:
+            ocrmypdf.ocr(pdf_path, 
+                        new_name,
+                        output_type="pdf",
+                        deskew=True, 
+                        )
+        except TaggedPDFError:
+            # Detected that the PDF is a Word doc but with no searchable text - force ocr
+            ocrmypdf.ocr(pdf_path, 
+                        new_name,
+                        output_type="pdf",
+                        force_ocr=True,
+                        deskew=True, 
+                        )
+        except EncryptedPdfError:
+            print("PDF is encrypted, skipping...")
+            continue            
+        # shutil.move(pdf_path, FULL_DOCS_PATH.joinpath(f"noocr/{Path(pdf_path).stem}.pdf"))
+        i = pdf_files.index(pdf_path)
+        pdf_files[i] = new_name
     return pdf_files
 
 def load_documents(db="chroma", recursive=True):
     """
     Load all PDF document and insert the chunks into a database
     """
-    pdf_files = glob(str(FULL_DOCS_PATH.joinpath("**/*.pdf")), recursive=recursive)
+    all_files = glob(str(FULL_DOCS_PATH.joinpath("**/*.pdf")), 
+                     recursive=recursive)
+    nonocr_files = glob(str(FULL_DOCS_PATH.joinpath("**/noocr/*.pdf")), 
+                     recursive=recursive)
+    pdf_files = list(set(all_files) - set(nonocr_files))
+    pdf_files = ocr_documents(pdf_files)
     db_data = {}
     ids = generate_or_update_metadata(pdf_files)
-    pdf_files = check_searchable_and_ocr_pdfs(pdf_files)
     data = [PyMuPDFLoader(FULL_DOCS_PATH.joinpath(pdf).as_posix()).load() for pdf in pdf_files]
     for d, id in zip(data, ids):
         for i, doc in enumerate(text_splitter.split_documents(d)):
@@ -174,4 +193,3 @@ def load_documents(db="chroma", recursive=True):
     elif db == "pinecone":
         return PineconeDB(db_data)
     raise ValueError("Invalid db choice")
-
